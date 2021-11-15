@@ -1,41 +1,41 @@
 package com.myorg;
 
 import software.amazon.awscdk.core.App;
-import software.amazon.awscdk.core.Environment;
-import software.amazon.awscdk.core.StackProps;
-
-import java.util.Arrays;
 
 public class CourseAwsCdkApp {
     public static void main(final String[] args) {
         App app = new App();
+        VpcStack vpcStack = new VpcStack(app, "VPC");
+        ClusterStack clusterStack = new ClusterStack(app, "CLUSTER", vpcStack.getVpc());
+        SnsStack snsStack = new SnsStack(app, "SNS");
+        DdbStack ddbStack = new DdbStack(app, "DDB");
 
-        new CourseAwsCdkStack(app, "CourseAwsCdkStack", StackProps.builder()
-                // If you don't specify 'env', this stack will be environment-agnostic.
-                // Account/Region-dependent features and context lookups will not work,
-                // but a single synthesized template can be deployed anywhere.
+        Service01Stack service01Stack = new Service01Stack(
+            app,
+            "SERVICE01",
+            clusterStack.getCluster(),
+            snsStack.getSnsTopic());
 
-                // Uncomment the next block to specialize this stack for the AWS Account
-                // and Region that are implied by the current CLI configuration.
-                /*
-                .env(Environment.builder()
-                        .account(System.getenv("CDK_DEFAULT_ACCOUNT"))
-                        .region(System.getenv("CDK_DEFAULT_REGION"))
-                        .build())
-                */
+        Service02Stack service02Stack = new Service02Stack(
+            app,
+            "SERVICE02",
+            clusterStack.getCluster(),
+            snsStack.getSnsTopic(),
+            ddbStack.getProductEventsDb()
+        );
 
-                // Uncomment the next block if you know exactly what Account and Region you
-                // want to deploy the stack to.
-                /*
-                .env(Environment.builder()
-                        .account("123456789012")
-                        .region("us-east-1")
-                        .build())
-                */
+        RdsStack rdsStack = new RdsStack(app,"RDS", vpcStack.getVpc());
 
-                // For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
-                .build());
+        clusterStack.addDependency(vpcStack);
+        rdsStack.addDependency(vpcStack);
 
+        service01Stack.addDependency(clusterStack);
+        service01Stack.addDependency(rdsStack);
+        service01Stack.addDependency(snsStack);
+
+        service02Stack.addDependency(clusterStack);
+        service02Stack.addDependency(snsStack);
+        service02Stack.addDependency(ddbStack);
         app.synth();
     }
 }
